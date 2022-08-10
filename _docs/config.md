@@ -805,7 +805,8 @@ auto resume interview: docassemble.eviction:data/questions/defend.yml
 When this is set, then whenever a user logs in, the user
 will be redirected to their first interview session involving the
 `docassemble.eviction:data/questions/defend.yml` interview.  Or, if
-they have no such session, a new session will
+they have no such session, a new session will be created and they will be
+redirected to the new session of the interview. 
 
 If you set an `auto resume interview`, you may wish to set [`show
 interviews link`] to `False` if the [My Interviews] menu is not useful
