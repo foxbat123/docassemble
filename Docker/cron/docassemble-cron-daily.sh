@@ -212,7 +212,7 @@ if [ "${DAREADONLYFILESYSTEM:-false}" == "false" ] && [ "${DABACKUPDAYS}" != "0"
     fi
 
     # Delete old rolling backup directories. If syncing to Azure, we do this below.
-    if [ "${AZUREENABLE:-false}" == "false" ]; then
+    if [ "${AZUREENABLE:-false}" == "false" ] && [ -z "${S3ENDPOINTURL}" ]; then
 	rm -rf `find "${DA_ROOT}/backup" -maxdepth 1 -path '*[0-9][0-9]-[0-9][0-9]' -a -type 'd' -a -mtime +${DABACKUPDAYS:-14} -print`
     fi
 
@@ -228,7 +228,20 @@ if [ "${DAREADONLYFILESYSTEM:-false}" == "false" ] && [ "${DABACKUPDAYS}" != "0"
 	    fi
 	    BACKUPTARGET="s3://${S3BUCKET}/backup/${LOCAL_HOSTNAME}"
 	fi
-	s4cmd --delete-removed dsync "${DA_ROOT}/backup" "${BACKUPTARGET}"
+	if [ -n "${S3ENDPOINTURL}" ]; then
+	    # S3-compatible providers may not support batch DeleteObjects
+	    s4cmd dsync "${DA_ROOT}/backup" "${BACKUPTARGET}"
+	    for the_dir in `find "${DA_ROOT}/backup" -maxdepth 1 -path '*[0-9][0-9]-[0-9][0-9]' -a -type 'd' -a -mtime +${DABACKUPDAYS:-14} -print`; do
+		DIRNAME=$(basename "${the_dir}")
+		s4cmd ls -r "${BACKUPTARGET}/${DIRNAME}/" | awk '{print $4}' | while read -r s3file; do
+		    s4cmd del "${s3file}"
+		done
+		rm -rf "${the_dir}"
+	    done
+	else
+	    # AWS S3 — existing behavior unchanged
+	    s4cmd --delete-removed dsync "${DA_ROOT}/backup" "${BACKUPTARGET}"
+	fi
     elif [ "${AZUREENABLE:-false}" == "true" ]; then
 	if [[ $CONTAINERROLE =~ .*:(all):.* ]]; then
 	    BACKUPTARGET="backup"
